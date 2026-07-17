@@ -477,7 +477,7 @@ let selected = null;
 let studentData = {}; // name -> {days:[...], chancesUsed:0}
 
 function isFirebaseConfigured(){
-  return FIREBASE_DB_URL && FIREBASE_DB_URL.startsWith('https://');
+  return FIREBASE_DB_URL && FIREBASE_DB_URL.startsWith('https:///every-ac99b-default-rtdb.firebaseio.com');
 }
 
 async function kvGet(key){
