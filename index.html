@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -281,7 +282,7 @@
   .day-cell.missed{ background:#fdeaea; border-color:#e39a9a; }
   .day-cell.future{ opacity:.45; }
   .day-cell.clickable{ cursor:pointer; }
-  .day-cell.clickable:hover{ transform: translateY(-2px); }
+  .day-cell.clickable:hover{ transform: translateY(-2px); box-shadow:0 3px 6px rgba(0,0,0,.15); }
 
   .legend{
     display:flex; gap:14px; flex-wrap:wrap;
@@ -289,6 +290,11 @@
   }
   .legend span{ display:inline-flex; align-items:center; gap:4px;}
   .dot{ width:10px; height:10px; border-radius:3px; display:inline-block;}
+  .edit-hint{
+    font-size:11px;
+    color:#8a8a8a;
+    margin-top:6px;
+  }
 
   /* ---------- Reset / admin ---------- */
   .btn-reset{
@@ -431,6 +437,7 @@
       <button class="btn-cancel" id="individualResetCancel">취소</button>
     </div>
     <div class="calendar" id="calendar"></div>
+    <p class="edit-hint">💡 지난 날짜 칸을 눌러서 완료/찬스 표시를 직접 고칠 수 있어요 (예: 설정 중 날짜가 지나버렸을 때)</p>
     <div class="legend">
       <span><i class="dot" style="background:#e3f4e5;border:1px solid #4caf7d;"></i>완료</span>
       <span><i class="dot" style="background:#fff3d6;border:1px solid #e0bd63;"></i>찬스 사용</span>
@@ -469,8 +476,7 @@ const TOTAL_DAYS = 21;
 const MAX_CHANCES = 2;
 const START_DATE = new Date(2026, 6, 17); // 2026-07-17 (month is 0-indexed)
 
-// ⚠️ 여기에 본인의 Firebase Realtime Database URL을 붙여넣으세요.
-// 예: "https://mission-garden-12345-default-rtdb.firebaseio.com"
+// ⚠️ 본인의 Firebase Realtime Database URL
 const FIREBASE_DB_URL = "https://every-ac99b-default-rtdb.firebaseio.com";
 
 let selected = null;
@@ -641,6 +647,14 @@ function renderDetail(){
     else if(status==='chance') emoji='⏰';
     else if(tIdx>=0 && i<tIdx) emoji='😶';
     else if(i===tIdx) emoji='👉';
+
+    // 오늘이거나 지난 날짜는 클릭해서 직접 고칠 수 있게 (설정 중 날짜가 지나버린 경우 등 대비)
+    const isFuture = tIdx>=0 && i>tIdx;
+    if(!isFuture){
+      cls += ' clickable';
+      cell.onclick = ()=> toggleDay(selected, i);
+    }
+
     cell.className = cls;
     cell.innerHTML = `<span class="day-num">${d.getMonth()+1}/${d.getDate()}</span><span class="day-emoji">${emoji}</span>`;
     cal.appendChild(cell);
@@ -681,6 +695,29 @@ async function useChance(name, tIdx){
   if(target<0) return;
   data.days[target]='chance';
   data.chancesUsed += 1;
+  await saveStudent(name, data);
+  renderPots(); renderStars(); renderDetail();
+}
+
+// 지난 날짜/오늘 칸을 직접 눌러 완료<->취소 전환 (찬스를 쓰지 않는 직접 수정용)
+async function toggleDay(name, i){
+  const data = studentData[name];
+  const d = dateAt(i);
+  const label = `${d.getMonth()+1}/${d.getDate()}`;
+  const current = data.days[i];
+
+  if(current === 'none'){
+    if(!confirm(`${label} 날짜를 완료✅로 표시할까요?\n(찬스를 쓰지 않는 직접 수정이에요)`)) return;
+    data.days[i] = 'done';
+    burstConfetti();
+  } else if(current === 'done'){
+    if(!confirm(`${label}의 완료 표시를 취소할까요?`)) return;
+    data.days[i] = 'none';
+  } else if(current === 'chance'){
+    if(!confirm(`${label}은 찬스로 표시된 날이에요.\n찬스 사용을 취소하고 찬스 1회를 돌려받을까요?`)) return;
+    data.days[i] = 'none';
+    data.chancesUsed = Math.max(0, data.chancesUsed - 1);
+  }
   await saveStudent(name, data);
   renderPots(); renderStars(); renderDetail();
 }
